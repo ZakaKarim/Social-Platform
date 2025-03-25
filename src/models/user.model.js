@@ -45,6 +45,10 @@ const userSchema = new Schema(
         ref: "FriendRequest",
       },
     ],
+    isDeactivated: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

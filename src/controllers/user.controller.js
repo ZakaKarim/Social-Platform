@@ -1,6 +1,7 @@
 import { User } from "../models/user.model.js";
 import { Post } from "../models/post.model.js";
 import { Comment } from "../models/comment.model.js";
+import { Block } from "../models/block.model.js";
 import mongoose from "mongoose";
 import {
   uploadOnCloudinary,
@@ -140,20 +141,22 @@ const fetchAllUser = async (req, res) => {
 const fetchSingleUser = async (req, res) => {
   try {
     // Checking what is coming in the req.user middleware from jwt
-    const userId = req.user.id;
-    console.log("User  ID:", userId);
-    console.log("req.user Details:", req.user);
-
+    // const userId = req.user.id;
+    // console.log("User  ID:", userId);
+    // console.log("req.user Details:", req.user);
     //Checking the username in the params to find the friend the user trying to find
     const username = req.params.username; // Assume the id is passed as a route parameter
-    // console.log(req.params.username);
-    // console.log(req.params);
+    console.log(req.params.username);
+    console.log(req.params);
 
     const user = await User.findOne({ username: username }).select("-password");
 
     if (!user) {
-      return res.status(404).json({ Message: "User not Found" });
-    }
+      return res.status(404).json({ message: "User  not found" });
+  }
+  if(user.isDeactivated){
+    return res.status(404).json({ message: "User  is Deactivated Sorry " })
+  }
     //console.log(`User with id ${id} and name ${user.username} fetched`);
     res.status(200).json({ Message: "Sinlge User Fetch Successfully", user });
   } catch (error) {
@@ -632,8 +635,8 @@ const getHomePagePosts = async (req, res) => {
 
     // Step 2: Fetch the user's friends list //agar koi error ata hai to yaha phr .select('friends') lagnai hai
     const user = await User.findById(userId);
+    console.log(user);
     const friendsList = user.friends; // Array of friend userIDs
-
     //Checking what is coming in friends array
     console.log("FriendList:", friendsList);
 
@@ -642,19 +645,24 @@ const getHomePagePosts = async (req, res) => {
     const friendsPosts = await Post.find({
       userID: { $in: friendsList }, // Posts by friends
       privacy: "Friends", // Only friends' posts
-    });
+    }).populate({ path: "userID", select: "username" });
     console.log("FriendPost", friendsPosts);
 
-    // Fetch public posts (privacy set to "Public")
+    // Fetch public posts with privacy set to "Public" agar ap nai just yaha phr
+    // content URL show karnai hai to .select use karnai hai at the end
     const publicPosts = await Post.find({
       privacy: "Public", // Public posts
-    });
+    }).populate({ path: "userID", select: "username" });
     console.log("PublicPost", publicPosts);
     // Step 4: Combine and sort posts by createdAt (newest first)
     const allPosts = [...friendsPosts, ...publicPosts];
     //allPosts.sort((a, b) => b.createdAt - a.createdAt);
-    console.log("Public Post ", allPosts);
-    return res.status(200).json(allPosts);
+    console.log("Combinbe All Post ", allPosts);
+    //return res.status(200).json(allPosts);
+     const activePosts = allPosts.filter(
+      (post) => !post.isHidden && !post.userID.isDeactivated
+    ); // Filter out hidden posts and deactivated users
+    return res.status(200).json(activePosts);
   } catch (error) {
     console.log("Error while Fetching Post for Home Page", error);
     return res
@@ -668,7 +676,7 @@ const addComment = async (req, res) => {
   try {
     // Step 1: Get the logged-in user's ID from the JWT token
     const userId = req.user._id;
-    // console.log("UserID: ",userId)
+    console.log("UserID: ", userId);
 
     // Step 2: Get the postID and comment from the request body
     const { postID, comment } = req.body;
@@ -684,18 +692,16 @@ const addComment = async (req, res) => {
 
     // Step 4: Check the post's privacy
     if (post.privacy === "Friends") {
-      const postCreater = await User.findById(post.userID).select("friends");
-      //console.log(postCreater)
+      const postCreater = await User.findById(post.userID);
+      console.log("Postcreater", postCreater);
       const friendsList = postCreater.friends;
       console.log(friendsList);
       // Check if the logged-in user is a friend of the post creator
       if (!friendsList.includes(userId)) {
-        return res
-          .status(404)
-          .json({
-            success: false,
-            message: "Only friends can comment on this post",
-          });
+        return res.status(404).json({
+          success: false,
+          message: "Only friends can comment on this post",
+        });
       }
     }
     // Step 5: Create the comment
@@ -709,18 +715,155 @@ const addComment = async (req, res) => {
     await newComment.save();
 
     // Step 6: Return the response
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Comment added successfully",
-        comment: newComment,
-      });
+    res.status(201).json({
+      success: true,
+      message: "Comment added successfully",
+      comment: newComment,
+    });
   } catch (error) {
     console.log("Error while adding a comment on the post", error);
     return res
       .status(500)
       .json({ Message: "Error while adding a comment on the post", error });
+  }
+};
+
+//Method to view the profilepost of friends
+const getProfilePosts = async (req, res) => {
+  try {
+    // Step 1: Extract visitor's userID from JWT
+    const visitorUserId = req.user._id;
+    console.log("visitorUserId", visitorUserId);
+
+    // Step 2: Get profile owner's userID from URL params
+    const profileUserId = req.params.id;
+    console.log("ProfileUserId:", profileUserId);
+
+    // Step 3: Check if visitor is a friend of the profile owner
+    const profileOwner = await User.findById(profileUserId);
+    console.log("ProfileOwner...", profileOwner);
+    const isFriend = profileOwner.friends.includes(visitorUserId);
+    console.log(isFriend);
+
+    // Step 4: Fetch posts based on friendship status
+    let posts;
+    if (isFriend) {
+      // If friends, fetch both "Friends" and "Public" posts
+      posts = await Post.find({
+        userID: profileUserId,
+        privacy: { $in: ["Friends", "Public"] },
+      });
+    } else {
+      // If not friends, fetch only "Public" posts
+      posts = await Post.find({
+        userID: profileUserId,
+        privacy: "Public",
+      });
+    }
+    console.log("POSTS", posts);
+    // Step 5: Return the posts
+    res.status(200).json({ success: true, posts });
+  } catch (error) {
+    console.log("Error While fetching profile post", error);
+    return res
+      .status(500)
+      .json({ Message: "Error While fetching profile post", error });
+  }
+};
+
+//Method that if a user block you than you cannot able to view his public or private Posts
+const getBlockpost = async (req, res) => {
+  try {
+    // 1: Get the logged-in user's ID from JWT
+    const currentUserId = req.user._id;
+    console.log("req.user.friend",req.user.friends)
+    console.log("Current User who want to view the profile", currentUserId);
+
+    const userId = req.params.id;
+    console.log("The user jis ki profile deknai cha raha hai", userId);
+
+    // 2. Find users who blocked current user
+    const blockedRecords = await Block.find({ blockedUserID: currentUserId });
+    console.log("blockedRecords",blockedRecords)
+    const blockerIds = blockedRecords.map(record => record.blockerUserID);
+    console.log("blockerIds",blockerIds)
+
+    
+    // // 3. Get all posts NOT from blockers
+    // const allVisiblePosts = await Post.find({
+    //   userID: { $nin: blockerIds } // Exclude posts from blockers
+    // });
+    // console.log("allVisiblePosts",allVisiblePosts)
+
+      // Step 3: Fetch posts (excluding blocked users)
+      const posts = await Post.find({
+        // Condition 1: Post is either "Public" OR from a friend
+        $or: [
+          { privacy: "Public" },
+          { 
+            privacy: "Friends",
+            userID: { $in: req.user.friends } // Only friends' posts
+          }
+        ],
+        // Condition 2: Exclude posts from users who blocked the current user
+        userID: { $nin: blockerIds}
+      })
+      console.log("Posts",posts)
+
+    res.status(200).json(posts);
+  } catch (error) {
+    console.log("Error While fetching profile post", error);
+    return res
+      .status(500)
+      .json({ Message: "Error While fetching profile post", error });
+  }
+};
+
+//Method to Deactivate Account
+const deactivateAccount = async(req,res)=>{
+    try {
+      const userId = req.user._id;
+      console.log("Logged in User", userId)
+      console.log("FULL DATA", req.user)
+       // 1. Mark user as deactivated
+      const user = await User.findByIdAndUpdate(userId, { isDeactivated: true });
+      console.log("user",user)
+  
+      // 2. (Optional) Hide all their posts immediately
+      const post = await Post.updateMany(
+        { userID: userId },
+        { $set: { isHidden: true } }  // Add this field to Post model if needed
+      )
+      console.log("Posts",post)
+      res.status(200).json({ success: true, message: "Account deactivated" });
+    } catch (error) {
+      console.log("Error While Deactivating Account", error);
+      return res
+        .status(500)
+        .json({ Message: "Error While Deactivating Account", error });
+    }
+}
+
+//Method to Activate Account
+const activateAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    console.log("Logged in User", userId)
+    console.log("FULL DATA", req.user)
+
+    // 1. Mark user as active
+    const user = await User.findByIdAndUpdate(userId, { isDeactivated: false });
+    console.log("user",user)
+
+    // 2. (Optional) Unhide all their posts
+    await Post.updateMany(
+      { userID: userId },
+      { $set: { isHidden: false } }
+    );
+
+    res.status(200).json({ success: true, message: "Account activated" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -738,4 +881,8 @@ export {
   getAllsentRequest,
   getHomePagePosts,
   addComment,
+  getProfilePosts,
+  getBlockpost,
+  deactivateAccount,
+  activateAccount
 };

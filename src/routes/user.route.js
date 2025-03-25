@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import { registerUser,loginUser, fetchAllUser, fetchSingleUser, updateProfilePicture, deleteUser, updateCoverImage, changePassword, updateAccountDetails, getAllFriendRequest, getAllsentRequest, getHomePagePosts, addComment } from '../controllers/user.controller.js';
+import { registerUser,loginUser, fetchAllUser, fetchSingleUser, updateProfilePicture, deleteUser, updateCoverImage, changePassword, updateAccountDetails, getAllFriendRequest, getAllsentRequest, getHomePagePosts, addComment, getProfilePosts, getBlockpost, deactivateAccount, activateAccount } from '../controllers/user.controller.js';
 
 import { upload } from '../middlewares/multer.js';
 import { verifyJWT } from '../middlewares/auth.js';
@@ -27,7 +27,7 @@ router.route('/login').post(loginUser)
 router.route('/').get(fetchAllUser)
 
 //Route to Fetch a Single User with findOne Method
-router.route('/:username').get(verifyJWT,fetchSingleUser)
+router.route('/:username').get(fetchSingleUser)
 
 //Route to update the profile Pictures
 router.route('/:id/updateProfilePicture').patch(upload.single('profileImage'),updateProfilePicture)
@@ -55,4 +55,16 @@ router.route('/homepage').post(verifyJWT,getHomePagePosts)
 
 //Route to add a comment on the post only if you are friend 
 router.route('/addcomment').post(verifyJWT,addComment)
+
+//Route to view the ProfilePost if you are friend only 
+router.route('/friendprofilepost/:id').post(verifyJWT,getProfilePosts)
+
+//Route for the block user who cannot see post of the user
+router.route('/blockuser/:id').post(verifyJWT,getBlockpost)
+
+//Route to Deactivate Account
+ router.route('/deactivateAccount').post(verifyJWT,deactivateAccount)
+
+ //Route to Deactivate Account
+ router.route('/activateAccount').post(verifyJWT,activateAccount)
 export default router;

@@ -51,15 +51,23 @@ const createPost = async (req, res) => {
 
 //Fetch all the post
 const fetchAllPosts = async (req, res) => {
-    try {
-        const posts = await Post.find().populate({path: 'userID', select: 'username'}).sort({ createdAt: -1 });
-        return res.status(200).json({ posts });
-    } catch (error) {
-        console.error("Error while fetching all posts", error);
-        return res
-        .status(500)
-        .json({ message: "Server error || Error while fetching all posts", error });
-    }
-}
+  try {
+    const posts = await Post.find()
+      .populate({ path: "userID", select: "username" })
+      .sort({ createdAt: -1 });
+    // const activePosts = posts.filter(
+    //   (post) => !post.isHidden && !post.userID.isDeactivated
+    // ); // Filter out hidden posts and deactivated users
+    return res.status(200).json(posts);
+  } catch (error) {
+    console.error("Error while fetching all posts", error);
+    return res
+      .status(500)
+      .json({
+        message: "Server error || Error while fetching all posts",
+        error,
+      });
+  }
+};
 
 export { createPost, fetchAllPosts };

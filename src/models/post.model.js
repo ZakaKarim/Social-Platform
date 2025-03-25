@@ -21,6 +21,10 @@ const postSchema = new Schema(
       type: String, // URL of the image or video
       required: true,
     },
+    isHidden: {  
+      type: Boolean,
+      default: false, // Posts are visible by default
+    },
   },
   { timestamps: true }
 );
