@@ -1,8 +1,11 @@
 import mongoose from 'mongoose';
 
 //Another Method to connected with the database 
-const MongoURL = 'mongodb://localhost:27017/Soical-Platform';
+//const MongoURL = 'mongodb://localhost:27017/Soical-Platform';
 
+
+//Live DataBase URL
+const MongoURL = process.env.DB_URL;
 const connectDB = async () => {
     try {
         const connectionInstance = await mongoose.connect(MongoURL);
