@@ -570,6 +570,7 @@ const getAllFriendRequest = async (req, res) => {
 //   }
 // };
 
+//Method to see which user i have sent friend request
 const getAllsentRequest = async (req, res) => {
   try {
     const userID = req.params.id;
