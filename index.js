@@ -13,6 +13,9 @@ app.use(express.json({limit: "30kb"}))
 app.use(express.urlencoded({extended: true, limit: "30kb"}))
 app.use(express.static("public"));
 
+app.get('/', (req, res) => {
+    res.send('Hello World')
+  })
 
 //Routes import
 import userRouter from "./src/routes/user.route.js";
