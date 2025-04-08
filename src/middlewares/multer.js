@@ -49,7 +49,7 @@ import path from "path";
 // const multer = require('multer');
 // const path = require('path');
  
-const upload = multer({
+export const upload = multer({
   storage: multer.diskStorage({}),
   // limits: { fileSize: 100 * 1024 * 1024 }, //100mb
   limits: { fieldSize: 52428800 }, //100mb
@@ -63,6 +63,6 @@ const upload = multer({
   },
 });
  
-export default upload;
+ 
  
  
